@@ -1,17 +1,14 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using CodeMonkey;
-using CodeMonkey.Utils;
 
 public class GameHandler : MonoBehaviour {
+    private LevelGrid levelGrid;
 
-    void Start() {
+    private void Start() {
         Debug.Log("GameHandler.Start");
 
-        GameObject snakeHeadGameObject = new GameObject();
-        SpriteRenderer snakeSpriteRenderer = snakeHeadGameObject.AddComponent<SpriteRenderer>();
-        snakeSpriteRenderer.sprite = GameAssets.i.snakeHeadSprite;
+        levelGrid = new LevelGrid(20, 20);
     }
 
     void Update() {
