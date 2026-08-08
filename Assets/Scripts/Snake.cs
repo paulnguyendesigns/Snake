@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 
 public class Snake : MonoBehaviour {
+    private LevelGrid levelGrid;
     private Vector2Int gridMoveDirection;
     private Vector2Int gridPosition;
     private float gridMoveTimer;
@@ -21,6 +22,11 @@ public class Snake : MonoBehaviour {
         HandleInput();
         HandleGridMovement();
     }
+
+    public void SetLevelGrid(LevelGrid levelGrid) {
+        this.levelGrid = levelGrid;
+    }
+
     private void UpdateSnakeRotation() {
         float angle = Mathf.Atan2(gridMoveDirection.y, gridMoveDirection.x) * Mathf.Rad2Deg + 90f;
         transform.eulerAngles = new Vector3(0, 0, angle);
@@ -52,15 +58,17 @@ public class Snake : MonoBehaviour {
             }
         }
     }
+
     private void HandleGridMovement() {
         gridMoveTimer += Time.deltaTime;
         if (gridMoveTimer >= gridMoveTimerMax) {
             gridPosition += gridMoveDirection;
             gridMoveTimer -= gridMoveTimerMax;
 
+            levelGrid?.SnakeMoved(gridPosition);
+
             UpdateSnakeRotation();
         }
         transform.position = new Vector3(gridPosition.x, gridPosition.y);
     }
 }
-

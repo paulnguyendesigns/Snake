@@ -9,6 +9,11 @@ public class GameHandler : MonoBehaviour {
         Debug.Log("GameHandler.Start");
 
         levelGrid = new LevelGrid(20, 20);
+
+        Snake snake = FindAnyObjectByType<Snake>();
+        if (snake != null) {
+            snake.SetLevelGrid(levelGrid);
+        }
     }
 
     void Update() {

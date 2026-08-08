@@ -5,6 +5,7 @@ using CodeMonkey;
 
 public class LevelGrid {
     private Vector2Int foodGridPosition;
+    private GameObject foodGameObject;
     private int width;
     private int height;
     public LevelGrid(int width, int height) {
@@ -12,13 +13,19 @@ public class LevelGrid {
         this.height = height;
 
         SpawnFood();
-        FunctionPeriodic.Create(SpawnFood, 0.5f);
     }
     private void SpawnFood() {
         foodGridPosition = new Vector2Int(Random.Range(0, width), Random.Range(0, height));
-
-        GameObject foodGameObject = new GameObject("Food", typeof(SpriteRenderer));
+        foodGameObject = new GameObject("Food", typeof(SpriteRenderer));
         foodGameObject.GetComponent<SpriteRenderer>().sprite = GameAssets.i.foodSprite;
         foodGameObject.transform.position = new Vector3(foodGridPosition.x, foodGridPosition.y);
+    }
+
+    public void SnakeMoved(Vector2Int snakeGridPosition) {
+        if (snakeGridPosition == foodGridPosition) {
+            Debug.Log("Snake ate the food");
+            Object.Destroy(foodGameObject);
+            SpawnFood();
+        }
     }
 }
