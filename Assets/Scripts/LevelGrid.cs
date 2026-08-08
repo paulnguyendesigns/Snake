@@ -15,7 +15,9 @@ public class LevelGrid {
         SpawnFood();
     }
     private void SpawnFood() {
-        foodGridPosition = new Vector2Int(Random.Range(0, width), Random.Range(0, height));
+        do {
+            foodGridPosition = new Vector2Int(Random.Range(0, width), Random.Range(0, height));
+        } while (foodGridPosition.x == 0 && foodGridPosition.y == 0); // Avoid spawning on the snake's starting position
         foodGameObject = new GameObject("Food", typeof(SpriteRenderer));
         foodGameObject.GetComponent<SpriteRenderer>().sprite = GameAssets.i.foodSprite;
         foodGameObject.transform.position = new Vector3(foodGridPosition.x, foodGridPosition.y);
