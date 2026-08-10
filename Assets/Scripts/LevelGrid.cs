@@ -19,6 +19,12 @@ public class LevelGrid {
         this.snake = snake;
     }
 
+    // Returns true if the given grid position is within the level bounds
+    public bool ValidateGridPosition(Vector2Int gridPosition) {
+        return gridPosition.x >= 0 && gridPosition.x < width &&
+               gridPosition.y >= 0 && gridPosition.y < height;
+    }
+
     public void SpawnFood() {
         List<Vector2Int> occupiedGridPositionList = snake != null
             ? snake.GetFullSnakeGridPositionList()

@@ -1,9 +1,26 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using CodeMonkey;
 
-public class Snake : MonoBehaviour
-{
+public class Snake : MonoBehaviour {
+    private enum Direction {
+        Up,
+        Down,
+        Left,
+        Right,
+    }
+
+    private class SnakeMovePosition {
+        public Vector2Int gridPosition;
+        public Direction direction;
+
+        public SnakeMovePosition(Vector2Int gridPosition, Direction direction) {
+            this.gridPosition = gridPosition;
+            this.direction = direction;
+        }
+    }
+
     private LevelGrid levelGrid;
 
     private Vector2Int gridMoveDirection;
@@ -13,8 +30,9 @@ public class Snake : MonoBehaviour
     private float gridMoveTimerMax;
 
     private int snakeBodySize;
-    private List<Vector2Int> snakeMovePositionList;
+    private List<SnakeMovePosition> snakeMovePositionList;
     private List<Transform> snakeBodyTransformList;
+    private bool isGameOver;
 
     private void Awake() {
         gridPosition = new Vector2Int(10, 10);
@@ -26,7 +44,7 @@ public class Snake : MonoBehaviour
 
         snakeBodySize = 0;
 
-        snakeMovePositionList = new List<Vector2Int>();
+        snakeMovePositionList = new List<SnakeMovePosition>();
         snakeBodyTransformList = new List<Transform>();
 
         UpdateSnakeRotation();
@@ -39,6 +57,10 @@ public class Snake : MonoBehaviour
     }
 
     private void Update() {
+        if (isGameOver) {
+            return;
+        }
+
         HandleInput();
         HandleGridMovement();
     }
@@ -50,6 +72,13 @@ public class Snake : MonoBehaviour
     private void UpdateSnakeRotation() {
         float angle = Mathf.Atan2(gridMoveDirection.y, gridMoveDirection.x) * Mathf.Rad2Deg + 90f;
         transform.eulerAngles = new Vector3(0, 0, angle);
+    }
+
+    private Direction GetDirection(Vector2Int vector) {
+        if (vector.x > 0) return Direction.Right;
+        if (vector.x < 0) return Direction.Left;
+        if (vector.y > 0) return Direction.Up;
+        return Direction.Down;
     }
 
     private void HandleInput() {
@@ -88,11 +117,22 @@ public class Snake : MonoBehaviour
         if (gridMoveTimer >= gridMoveTimerMax) {
             gridMoveTimer -= gridMoveTimerMax;
 
-            // Store the snake head's current position before moving
-            snakeMovePositionList.Insert(0, gridPosition);
+            Vector2Int nextHeadGridPosition = gridPosition + gridMoveDirection;
+
+            // Check for death BEFORE mutating any state, so a fatal move never
+            // touches the position history / body transforms in the first place.
+            if (!levelGrid.ValidateGridPosition(nextHeadGridPosition) || IsSnakeBodyGridPosition(nextHeadGridPosition)) {
+                HandleDeath();
+                return;
+            }
+
+            // Store the snake head's current position and the direction it's
+            // about to move in, before actually moving
+            Direction currentMoveDirection = GetDirection(gridMoveDirection);
+            snakeMovePositionList.Insert(0, new SnakeMovePosition(gridPosition, currentMoveDirection));
 
             // Move the snake head
-            gridPosition += gridMoveDirection;
+            gridPosition = nextHeadGridPosition;
 
             bool snakeAteFood = levelGrid.TrySnakeEatFood(gridPosition);
 
@@ -104,7 +144,7 @@ public class Snake : MonoBehaviour
                 snakeBodySize++;
 
                 Transform newBodyTransform = CreateSnakeBodyTransform();
-                Vector2Int newBodyPosition = snakeMovePositionList[snakeMovePositionList.Count - 1];
+                Vector2Int newBodyPosition = snakeMovePositionList[snakeMovePositionList.Count - 1].gridPosition;
                 newBodyTransform.position = new Vector3(newBodyPosition.x, newBodyPosition.y, 0);
                 snakeBodyTransformList.Add(newBodyTransform);
             } else {
@@ -115,9 +155,9 @@ public class Snake : MonoBehaviour
                 }
             }
 
-            // Update each body part to follow along the recorded path
+            // Update each body part's position and rotation
             for (int i = 0; i < snakeBodyTransformList.Count; i++) {
-                snakeBodyTransformList[i].position = new Vector3(snakeMovePositionList[i].x, snakeMovePositionList[i].y, 0);
+                UpdateSnakeBodyPart(i);
             }
 
             UpdateSnakeRotation();
@@ -126,9 +166,112 @@ public class Snake : MonoBehaviour
         transform.position = new Vector3(gridPosition.x, gridPosition.y, 0);
     }
 
+    // Positions and rotates body segment 'index'. Straight segments (previous
+    // direction == current direction, the 'default' angle) snap to that
+    // direction's normal 90-degree-increment angle. Corner segments get a
+    // 45-degree diagonal angle plus a small positional nudge toward the
+    // inside of the turn, so the two connecting edges read as a seamless bend.
+    //
+    // 'currentDirection' is this segment's OWN direction (where it's heading,
+    // toward the head). 'previousDirection' is the direction of the segment
+    // BEHIND it (tail-ward, index+1 in the history list) -- i.e. how this
+    // segment was arrived at. Comparing the two tells us whether this exact
+    // segment is the corner (not the one before or after it).
+    private void UpdateSnakeBodyPart(int index) {
+        SnakeMovePosition snakeMovePosition = snakeMovePositionList[index];
+        Vector2Int bodyGridPosition = snakeMovePosition.gridPosition;
+
+        Direction currentDirection = snakeMovePosition.direction;
+        Direction previousDirection = (index + 1 < snakeMovePositionList.Count)
+            ? snakeMovePositionList[index + 1].direction
+            : currentDirection; // tail segment: nothing behind it, so treat as straight
+
+        Vector3 bodyPosition = new Vector3(bodyGridPosition.x, bodyGridPosition.y, 0f);
+        float angle;
+
+        switch (currentDirection) {
+            default:
+            case Direction.Up:
+                angle = 180f;
+                switch (previousDirection) {
+                    case Direction.Left:
+                        angle = 90f - 45f;
+                        bodyPosition += new Vector3(+0.2f, +0.2f, 0f);
+                        break;
+                    case Direction.Right:
+                        angle = 90f + 45f;
+                        bodyPosition += new Vector3(-0.2f, +0.2f, 0f);
+                        break;
+                }
+                break;
+            case Direction.Down:
+                angle = 0f;
+                switch (previousDirection) {
+                    case Direction.Left:
+                        angle = 90f + 45f;
+                        bodyPosition += new Vector3(+0.2f, -0.2f, 0f);
+                        break;
+                    case Direction.Right:
+                        angle = 90f - 45f;
+                        bodyPosition += new Vector3(-0.2f, -0.2f, 0f);
+                        break;
+                }
+                break;
+            case Direction.Left:
+                angle = 270f;
+                switch (previousDirection) {
+                    case Direction.Up:
+                        angle = 180f + 45f;
+                        bodyPosition += new Vector3(-0.2f, -0.2f, 0f);
+                        break;
+                    case Direction.Down:
+                        angle = 180f - 45f;
+                        bodyPosition += new Vector3(-0.2f, +0.2f, 0f);
+                        break;
+                }
+                break;
+            case Direction.Right:
+                angle = 90f;
+                switch (previousDirection) {
+                    case Direction.Up:
+                        angle = 180f - 45f;
+                        bodyPosition += new Vector3(+0.2f, -0.2f, 0f);
+                        break;
+                    case Direction.Down:
+                        angle = 180f + 45f;
+                        bodyPosition += new Vector3(+0.2f, +0.2f, 0f);
+                        break;
+                }
+                break;
+        }
+
+        snakeBodyTransformList[index].position = bodyPosition;
+        snakeBodyTransformList[index].eulerAngles = new Vector3(0, 0, angle);
+    }
+
+    // Checks whether a grid position overlaps the snake's own body.
+    // The tail segment is excluded because it vacates its cell as part of
+    // this same move (unless the snake is growing), so moving into the
+    // current tail cell is a normal, non-fatal move.
+    private bool IsSnakeBodyGridPosition(Vector2Int testGridPosition) {
+        for (int i = 0; i < snakeBodySize - 1; i++) {
+            if (snakeMovePositionList[i].gridPosition == testGridPosition) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void HandleDeath() {
+        isGameOver = true;
+        CMDebug.TextPopup("DEAD!", transform.position);
+    }
+
     public List<Vector2Int> GetFullSnakeGridPositionList() {
         List<Vector2Int> fullSnakeGridPositionList = new List<Vector2Int>() { gridPosition };
-        fullSnakeGridPositionList.AddRange(snakeMovePositionList.GetRange(0, snakeBodySize));
+        for (int i = 0; i < snakeBodySize; i++) {
+            fullSnakeGridPositionList.Add(snakeMovePositionList[i].gridPosition);
+        }
         return fullSnakeGridPositionList;
     }
 }
