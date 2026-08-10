@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -13,7 +13,10 @@ public class GameHandler : MonoBehaviour {
         Snake snake = FindAnyObjectByType<Snake>();
         if (snake != null) {
             snake.SetLevelGrid(levelGrid);
+            levelGrid.SetSnake(snake);
         }
+
+        levelGrid.SpawnFood();
     }
 
     void Update() {

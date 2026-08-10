@@ -16,41 +16,26 @@ public class Snake : MonoBehaviour
     private List<Vector2Int> snakeMovePositionList;
     private List<Transform> snakeBodyTransformList;
 
-    [SerializeField] private Sprite snakeBodySprite;
-
     private void Awake() {
         gridPosition = new Vector2Int(10, 10);
 
-        gridMoveTimerMax = 1f;
+        gridMoveTimerMax = 0.1f;
         gridMoveTimer = gridMoveTimerMax;
 
         gridMoveDirection = new Vector2Int(1, 0);
 
-        snakeBodySize = 10;
+        snakeBodySize = 0;
 
         snakeMovePositionList = new List<Vector2Int>();
         snakeBodyTransformList = new List<Transform>();
 
-        // Create the persistent body part(s) once, using the White (1x1) sprite asset.
-        // Start them stacked on the head so they don't flash at the world origin
-        // before they've received real position history.
-        for (int i = 0; i < snakeBodySize; i++) {
-            Transform bodyTransform = CreateSnakeBodyTransform();
-            bodyTransform.position = new Vector3(gridPosition.x, gridPosition.y, 0);
-            snakeBodyTransformList.Add(bodyTransform);
-        }
         UpdateSnakeRotation();
     }
 
     private Transform CreateSnakeBodyTransform() {
-        GameObject bodyPart = new GameObject("Snake Body");
-
-        SpriteRenderer spriteRenderer = bodyPart.AddComponent<SpriteRenderer>();
-        spriteRenderer.sprite = snakeBodySprite;
-
-        bodyPart.transform.localScale = Vector3.one * 0.75f;
-
-        return bodyPart.transform;
+        GameObject snakeBodyGameObject = new GameObject("Snake Body", typeof(SpriteRenderer));
+        snakeBodyGameObject.GetComponent<SpriteRenderer>().sprite = GameAssets.i.snakeBodySprite;
+        return snakeBodyGameObject.transform;
     }
 
     private void Update() {
@@ -106,30 +91,44 @@ public class Snake : MonoBehaviour
             // Store the snake head's current position before moving
             snakeMovePositionList.Insert(0, gridPosition);
 
-            // Keep only as many stored positions as there are body parts
-            if (snakeMovePositionList.Count > snakeBodySize) {
-                snakeMovePositionList.RemoveAt(snakeMovePositionList.Count - 1);
-            }
-
             // Move the snake head
             gridPosition += gridMoveDirection;
 
-            // Update each persistent body part to follow behind the head.
-            // Only update parts for which we have recorded position history so far
-            // (early on, the list has fewer entries than there are body parts).
-            for (int i = 0; i < snakeBodyTransformList.Count && i < snakeMovePositionList.Count; i++) {
-                Vector2Int snakeMovePosition = snakeMovePositionList[i];
+            bool snakeAteFood = levelGrid.TrySnakeEatFood(gridPosition);
 
-                snakeBodyTransformList[i].position = new Vector3(snakeMovePosition.x, snakeMovePosition.y, 0);
+            if (snakeAteFood) {
+                // Grow: keep the extra history entry we just inserted instead of
+                // trimming it away, and use it as the new tail segment's starting
+                // position -- so the new body part appears immediately at the
+                // correct trailing spot, with no extra move needed to reveal it.
+                snakeBodySize++;
+
+                Transform newBodyTransform = CreateSnakeBodyTransform();
+                Vector2Int newBodyPosition = snakeMovePositionList[snakeMovePositionList.Count - 1];
+                newBodyTransform.position = new Vector3(newBodyPosition.x, newBodyPosition.y, 0);
+                snakeBodyTransformList.Add(newBodyTransform);
+            } else {
+                // Not growing this tick: trim the oldest history entry so the
+                // list stays exactly as long as the current body size.
+                if (snakeMovePositionList.Count > snakeBodySize) {
+                    snakeMovePositionList.RemoveAt(snakeMovePositionList.Count - 1);
+                }
             }
 
-            if (levelGrid != null) {
-                levelGrid.SnakeMoved(gridPosition);
+            // Update each body part to follow along the recorded path
+            for (int i = 0; i < snakeBodyTransformList.Count; i++) {
+                snakeBodyTransformList[i].position = new Vector3(snakeMovePositionList[i].x, snakeMovePositionList[i].y, 0);
             }
 
             UpdateSnakeRotation();
         }
 
-        transform.position = new Vector3(gridPosition.x,gridPosition.y, 0);
+        transform.position = new Vector3(gridPosition.x, gridPosition.y, 0);
+    }
+
+    public List<Vector2Int> GetFullSnakeGridPositionList() {
+        List<Vector2Int> fullSnakeGridPositionList = new List<Vector2Int>() { gridPosition };
+        fullSnakeGridPositionList.AddRange(snakeMovePositionList.GetRange(0, snakeBodySize));
+        return fullSnakeGridPositionList;
     }
 }
