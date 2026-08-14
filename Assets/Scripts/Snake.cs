@@ -33,6 +33,7 @@ public class Snake : MonoBehaviour {
     private List<SnakeMovePosition> snakeMovePositionList;
     private List<Transform> snakeBodyTransformList;
     private bool isGameOver;
+    private bool hasStarted;
 
     private void Awake() {
         gridPosition = new Vector2Int(10, 10);
@@ -47,6 +48,7 @@ public class Snake : MonoBehaviour {
         snakeMovePositionList = new List<SnakeMovePosition>();
         snakeBodyTransformList = new List<Transform>();
 
+        transform.position = new Vector3(gridPosition.x, gridPosition.y, 0); // Set scene position to match grid position
         UpdateSnakeRotation();
     }
 
@@ -62,7 +64,10 @@ public class Snake : MonoBehaviour {
         }
 
         HandleInput();
-        HandleGridMovement();
+
+        if (hasStarted) {
+            HandleGridMovement();
+        }
     }
 
     public void SetLevelGrid(LevelGrid levelGrid) {
@@ -82,6 +87,11 @@ public class Snake : MonoBehaviour {
     }
 
     private void HandleInput() {
+        if (Input.GetKeyDown(KeyCode.UpArrow) || Input.GetKeyDown(KeyCode.DownArrow) ||
+            Input.GetKeyDown(KeyCode.LeftArrow) || Input.GetKeyDown(KeyCode.RightArrow)) {
+            hasStarted = true;
+        }
+
         if (Input.GetKeyDown(KeyCode.UpArrow)) {
             if (gridMoveDirection.y != -1) {
                 gridMoveDirection.x = 0;
